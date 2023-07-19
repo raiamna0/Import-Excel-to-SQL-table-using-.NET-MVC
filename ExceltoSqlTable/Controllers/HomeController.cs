@@ -1,6 +1,7 @@
 ﻿using ExceltoSqlTable.Models;
 using Newtonsoft.Json;
 using System;
+using System.Configuration;
 using System.Data;
 using System.Data.OleDb;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Web.Mvc;
 
 public class HomeController : Controller
 {
+	string cs = ConfigurationManager.ConnectionStrings["dbcs"].ConnectionString;
 	public ActionResult Upload()
 	{
 		return View();
