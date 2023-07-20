@@ -4,6 +4,7 @@ using System;
 using System.Configuration;
 using System.Data;
 using System.Data.OleDb;
+using System.Data.SqlClient;
 using System.IO;
 using System.Web;
 using System.Web.Mvc;
@@ -27,6 +28,9 @@ public class HomeController : Controller
 			DataTable excelData = ExtractExcelData(filePath);
 			if (excelData != null)
 			{
+				string createTableQuery = GetCreateTableQuery(excelData);
+				CreateSQLTable(createTableQuery);
+				SaveDataToSQLTable(excelData);
 				var model = new ExcelDataModel
 				{
 					FilePath = filePath,
@@ -46,7 +50,50 @@ public class HomeController : Controller
 		return View();
 	}
 
+	
+	private string GetCreateTableQuery(DataTable dataTable)
+	{
+		// Generate the CREATE TABLE query based on the DataTable columns and inferred data types
+		string createTableQuery = "CREATE TABLE YourTableName (";
 
+		foreach (DataColumn column in dataTable.Columns)
+		{
+			string dataType = GetSQLDataType(column);
+			createTableQuery += $"[{column.ColumnName}] {dataType}, ";
+		}
+
+		createTableQuery = createTableQuery.TrimEnd(',', ' ') + ")";
+
+		return createTableQuery;
+	}
+	private string GetSQLDataType(DataColumn column)
+	{
+		// Infer the SQL data type based on the Excel data type in the DataTable column
+		Type dataType = column.DataType;
+
+		if (dataType == typeof(int) || dataType == typeof(long))
+			return "INT";
+		else if (dataType == typeof(decimal) || dataType == typeof(double))
+			return "DECIMAL(18, 2)";
+		else if (dataType == typeof(DateTime))
+			return "DATETIME";
+		else
+			return "NVARCHAR(255)"; // Default to NVARCHAR for other data types
+	}
+	private void CreateSQLTable(string createTableQuery)
+	{
+		using (SqlConnection connection = new SqlConnection(cs))
+		{
+			connection.Open();
+
+			using (SqlCommand command = new SqlCommand(createTableQuery, connection))
+			{
+				command.ExecuteNonQuery();
+			}
+
+			connection.Close();
+		}
+	}
 	private DataTable ExtractExcelData(string filePath)
 	{
 		string connString = string.Empty;
@@ -81,5 +128,20 @@ public class HomeController : Controller
 			columnNames[i] = table.Columns[i].ColumnName;
 		}
 		return columnNames;
+	}
+	private void SaveDataToSQLTable(DataTable dataTable)
+	{
+		using (SqlConnection connection = new SqlConnection(cs))
+		{
+			connection.Open();
+
+			using (SqlBulkCopy bulkCopy = new SqlBulkCopy(connection))
+			{
+				bulkCopy.DestinationTableName = "YourTableName"; // Replace with your actual table name
+				bulkCopy.WriteToServer(dataTable);
+			}
+
+			connection.Close();
+		}
 	}
 }
